@@ -207,8 +207,36 @@ FROM price_history ph
 JOIN products p ON ph.product_id = p.id
 ORDER BY ph.changed_at DESC;
 
--- Insert default admin user (password: admin123)
--- Note: In production, use proper password hashing
-INSERT INTO users (email, password_hash, full_name, role)
-VALUES ('admin@arkiegasul.com', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqCQYgqJdYJLOF1xJPF0FhYN', 'Admin User', 'admin')
-ON CONFLICT (email) DO NOTHING;
+-- Enable Row Level Security
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_movements ENABLE ROW LEVEL SECURITY;
+
+-- Users policies - users can read their own data, admin can read all
+CREATE POLICY "Users can view own record" ON users FOR SELECT USING (auth.uid()::text = id::text);
+CREATE POLICY "Users can update own record" ON users FOR UPDATE USING (auth.uid()::text = id::text);
+CREATE POLICY "Admin can view all users" ON users FOR ALL USING (
+    EXISTS (SELECT 1 FROM users WHERE id::text = auth.uid()::text AND role = 'admin')
+);
+
+-- Products policies - authenticated users can CRUD products (admin panel)
+CREATE POLICY "Authenticated users can view products" ON products FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Authenticated users can insert products" ON products FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated users can update products" ON products FOR UPDATE TO authenticated USING (true);
+CREATE POLICY "Authenticated users can delete products" ON products FOR DELETE TO authenticated USING (true);
+
+-- Price history policies
+CREATE POLICY "Authenticated users can view price history" ON price_history FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Authenticated users can insert price history" ON price_history FOR INSERT TO authenticated WITH CHECK (true);
+
+-- Sales policies - authenticated users can manage sales
+CREATE POLICY "Authenticated users can view sales" ON sales FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Authenticated users can insert sales" ON sales FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated users can update sales" ON sales FOR UPDATE TO authenticated USING (true);
+
+-- Inventory movements policies
+CREATE POLICY "Authenticated users can view inventory movements" ON inventory_movements FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Authenticated users can insert inventory movements" ON inventory_movements FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated users can update inventory movements" ON inventory_movements FOR UPDATE TO authenticated USING (true);

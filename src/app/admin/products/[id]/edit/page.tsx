@@ -1,24 +1,47 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Upload, X, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { db } from '@/lib/db';
+import { db, type Product } from '@/lib/db';
 import { createClient } from '@/utils/supabase/client';
 
-export default function NewProductPage() {
+export default function EditProductPage() {
   const router = useRouter();
+  const params = useParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
+  const [product, setProduct] = useState<Product | null>(null);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function loadProduct() {
+      if (!params.id) return;
+      const { data, error } = await db.products.getById(params.id as string);
+      if (error) {
+        setError('Failed to load product: ' + error.message);
+        setLoading(false);
+        return;
+      }
+      const prod = data as Product;
+      setProduct(prod);
+      setName(prod.name);
+      setPrice(prod.current_price.toString());
+      setStock(prod.stock_quantity.toString());
+      setImagePreview(prod.image_url);
+      setLoading(false);
+    }
+    loadProduct();
+  }, [params.id]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -37,12 +60,14 @@ export default function NewProductPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!product) return;
+
     setIsLoading(true);
     setError('');
 
-    let imageUrl: string | null = null;
+    let imageUrl = product.image_url; // Keep existing image if no new one
 
-    // Upload image if provided
+    // Upload new image if provided
     if (selectedFile) {
       const supabase = createClient();
       const fileExt = selectedFile.name.split('.').pop() || 'jpg';
@@ -58,16 +83,15 @@ export default function NewProductPage() {
         return;
       }
 
-      const { data: urlData } = supabase.storage
+      const { data: urlData } = await supabase.storage
         .from('product-images')
         .getPublicUrl(fileName);
 
       imageUrl = urlData.publicUrl;
     }
 
-    const { error: dbError } = await db.products.create({
+    const { error: dbError } = await db.products.update(product.id, {
       name,
-      description: null,
       current_price: parseFloat(price),
       stock_quantity: parseInt(stock),
       image_url: imageUrl,
@@ -75,13 +99,35 @@ export default function NewProductPage() {
     });
 
     if (dbError) {
-      setError('Failed to create product: ' + dbError.message);
+      setError('Failed to update product: ' + dbError.message);
       setIsLoading(false);
       return;
     }
 
     router.push('/admin/products');
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  if (error && !product) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600">{error}</p>
+        <Link
+          href="/admin/products"
+          className="mt-4 inline-block px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+        >
+          Back to Products
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-page-in">
@@ -92,7 +138,7 @@ export default function NewProductPage() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Add New Product</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Edit Product</h1>
       </div>
 
       {error && (
@@ -186,7 +232,7 @@ export default function NewProductPage() {
             </div>
             <div>
               <label htmlFor="stock" className="block text-sm font-medium text-gray-700 mb-2">
-                Initial Stock *
+                Stock Quantity *
               </label>
               <input
                 id="stock"
@@ -221,7 +267,7 @@ export default function NewProductPage() {
                 Saving...
               </>
             ) : (
-              'Save Product'
+              'Save Changes'
             )}
           </button>
         </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Minus, AlertTriangle, History, Package, Loader2 } from 'lucide-react';
+import { Plus, Minus, AlertTriangle, History, Package, Loader2, Edit } from 'lucide-react';
 import { db, type Product, type InventoryMovement } from '@/lib/db';
 
 interface MovementWithProduct extends InventoryMovement {
@@ -17,6 +17,8 @@ export default function InventoryPage() {
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adjusting, setAdjusting] = useState(false);
+  const [newStockQty, setNewStockQty] = useState(0);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -46,6 +48,12 @@ export default function InventoryPage() {
     setShowAdjustmentModal(true);
   };
 
+  const handleEditStock = (product: Product) => {
+    setSelectedProduct(product);
+    setNewStockQty(product.stock_quantity);
+    setShowEditModal(true);
+  };
+
   const submitAdjustment = async () => {
     if (!selectedProduct || adjustmentQty === 0 || !adjustmentReason.trim()) return;
     setAdjusting(true);
@@ -72,6 +80,37 @@ export default function InventoryPage() {
 
     setAdjusting(false);
     setShowAdjustmentModal(false);
+  };
+
+  const submitEditStock = async () => {
+    if (!selectedProduct) return;
+    setAdjusting(true);
+
+    const adjustment = newStockQty - selectedProduct.stock_quantity;
+    const reason = `Direct stock edit: ${selectedProduct.stock_quantity} → ${newStockQty}`;
+
+    const { error } = await db.inventory.adjustStock(
+      selectedProduct.id,
+      adjustment,
+      reason
+    );
+
+    if (error) {
+      alert('Failed to edit stock: ' + (error instanceof Error ? error.message : String(error)));
+      setAdjusting(false);
+      return;
+    }
+
+    // Refresh data
+    const [productsRes, movementsRes] = await Promise.all([
+      db.products.getAll(),
+      db.inventory.getMovements(),
+    ]);
+    setProducts((productsRes.data as Product[]) || []);
+    setMovements(((movementsRes.data as MovementWithProduct[]) || []).slice(0, 15));
+
+    setAdjusting(false);
+    setShowEditModal(false);
   };
 
   if (loading) {
@@ -154,6 +193,13 @@ export default function InventoryPage() {
                         title="Adjust stock"
                       >
                         <History className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleEditStock(product)}
+                        className="p-2 text-gray-600 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
+                        title="Edit stock directly"
+                      >
+                        <Edit className="h-4 w-4" />
                       </button>
                     </div>
                   </div>
@@ -280,6 +326,66 @@ export default function InventoryPage() {
                   </>
                 ) : (
                   'Adjust Stock'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Stock Modal */}
+      {showEditModal && selectedProduct && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4 animate-scale-in">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Edit Stock: {selectedProduct.name}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Current stock: {selectedProduct.stock_quantity} units
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  New Stock Quantity
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={newStockQty}
+                  onChange={(e) => setNewStockQty(parseInt(e.target.value) || 0)}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Enter new stock quantity"
+                />
+              </div>
+
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  Stock will be adjusted by: <strong>{newStockQty - selectedProduct.stock_quantity > 0 ? '+' : ''}{newStockQty - selectedProduct.stock_quantity} units</strong>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                disabled={adjusting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitEditStock}
+                disabled={newStockQty < 0 || adjusting}
+                className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {adjusting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
                 )}
               </button>
             </div>

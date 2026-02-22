@@ -50,7 +50,7 @@ export default function AdminLayout({
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 fixed h-full z-10 hidden md:flex flex-col">
+      <aside className="w-64 bg-gray-900 border-r border-gray-200 fixed h-full z-10 hidden md:flex flex-col">
         <div className="p-5 border-b border-gray-200">
           <Link href="/admin/dashboard" className="flex items-center gap-2">
             <Image
@@ -61,8 +61,8 @@ export default function AdminLayout({
               className="object-contain"
             />
             <div>
-              <span className="text-lg font-bold text-gray-900 leading-tight block">Arkie Gasul</span>
-              <span className="text-xs text-gray-500">Admin Panel</span>
+              <span className="text-lg font-bold text-white leading-tight block">Arkie Gasul</span>
+              <span className="text-xs text-gray-400">Admin Panel</span>
             </div>
           </Link>
         </div>
@@ -76,11 +76,11 @@ export default function AdminLayout({
                 href={link.href}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                   active
-                    ? 'bg-orange-50 text-orange-600 font-semibold shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-orange-500'
+                    ? 'bg-orange-900 text-orange-300 font-semibold shadow-sm'
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-orange-400'
                 }`}
               >
-                <link.icon className={`h-5 w-5 transition-colors ${active ? 'text-orange-500' : ''}`} />
+                <link.icon className={`h-5 w-5 transition-colors ${active ? 'text-orange-300' : 'text-gray-300'}`} />
                 <span className="font-medium">{link.label}</span>
               </Link>
             );
@@ -90,7 +90,7 @@ export default function AdminLayout({
         <div className="p-4 border-t border-gray-200">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-3 text-red-600 rounded-lg hover:bg-red-50 transition-colors w-full"
+            className="flex items-center gap-3 px-4 py-3 text-red-400 rounded-lg hover:bg-red-900 transition-colors w-full"
           >
             <LogOut className="h-5 w-5" />
             <span className="font-medium">Logout</span>
@@ -99,7 +99,7 @@ export default function AdminLayout({
       </aside>
 
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-30">
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-gray-900 border-b border-gray-200 z-30">
         <div className="flex items-center justify-between p-4">
           <Link href="/admin/dashboard" className="flex items-center gap-2">
             <Image
@@ -109,11 +109,11 @@ export default function AdminLayout({
               height={36}
               className="object-contain"
             />
-            <span className="text-lg font-bold text-gray-900">Arkie Gasul</span>
+            <span className="text-lg font-bold text-white">Arkie Gasul</span>
           </Link>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
+            className="p-2 text-gray-300 hover:text-gray-400 rounded-lg hover:bg-gray-800 transition-colors"
           >
             {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -130,7 +130,7 @@ export default function AdminLayout({
 
       {/* Mobile Sidebar */}
       <div
-        className={`md:hidden fixed top-[65px] left-0 bottom-0 w-72 bg-white z-25 transform transition-transform duration-300 ease-out shadow-xl ${
+        className={`md:hidden fixed top-[65px] left-0 bottom-0 w-72 bg-gray-900 z-25 transform transition-transform duration-300 ease-out shadow-xl ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ zIndex: 25 }}
@@ -145,11 +145,11 @@ export default function AdminLayout({
                 onClick={closeMobileMenu}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                   active
-                    ? 'bg-orange-50 text-orange-600 font-semibold'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-orange-500'
+                    ? 'bg-orange-900 text-orange-300 font-semibold'
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-orange-400'
                 }`}
               >
-                <link.icon className={`h-5 w-5 ${active ? 'text-orange-500' : ''}`} />
+                <link.icon className={`h-5 w-5 ${active ? 'text-orange-300' : 'text-gray-300'}`} />
                 <span className="font-medium">{link.label}</span>
               </Link>
             );
@@ -158,7 +158,7 @@ export default function AdminLayout({
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
           <button
             onClick={() => { closeMobileMenu(); handleLogout(); }}
-            className="flex items-center gap-3 px-4 py-3 text-red-600 rounded-lg hover:bg-red-50 transition-colors w-full"
+            className="flex items-center gap-3 px-4 py-3 text-red-400 rounded-lg hover:bg-red-900 transition-colors w-full"
           >
             <LogOut className="h-5 w-5" />
             <span className="font-medium">Logout</span>
