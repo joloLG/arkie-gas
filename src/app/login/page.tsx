@@ -50,7 +50,6 @@ export default function LoginPage() {
               priority
             />
           </div>
-          <p className="text-gray-600 mt-2">Sign in to your account</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-8">
