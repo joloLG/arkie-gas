@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,20 +20,25 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
 
-    // For now, simulate login - will connect to Supabase later
-    setTimeout(() => {
-      if (email === 'admin@arkiegasul.com' && password === 'admin123') {
-        router.push('/admin/dashboard');
-      } else {
-        setError('Invalid credentials');
-        setIsLoading(false);
-      }
-    }, 1000);
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (authError) {
+      setError(authError.message);
+      setIsLoading(false);
+      return;
+    }
+
+    router.push('/admin/dashboard');
+    router.refresh();
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md animate-scale-in">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <Image

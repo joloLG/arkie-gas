@@ -1,33 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, Plus, Minus } from 'lucide-react';
 import Link from 'next/link';
-
-interface Product {
-  id: string;
-  name: string;
-  current_price: number;
-  stock_quantity: number;
-}
-
-const sampleProducts: Product[] = [
-  { id: '1', name: '11kg LPG Tank', current_price: 900.00, stock_quantity: 25 },
-  { id: '2', name: '5kg LPG Tank', current_price: 480.00, stock_quantity: 15 },
-  { id: '3', name: '2.7kg LPG Tank', current_price: 350.00, stock_quantity: 8 },
-];
+import { db, type Product } from '@/lib/db';
 
 export default function RecordSalePage() {
   const router = useRouter();
+  const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function loadProducts() {
+      const { data } = await db.products.getAll();
+      const active = ((data as Product[]) || []).filter(p => p.is_active && p.stock_quantity > 0);
+      setProducts(active);
+      setPageLoading(false);
+    }
+    loadProducts();
+  }, []);
 
   const handleProductSelect = (productId: string) => {
-    const product = sampleProducts.find(p => p.id === productId);
+    const product = products.find(p => p.id === productId);
     setSelectedProduct(product || null);
+    setQuantity(1);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,28 +37,39 @@ export default function RecordSalePage() {
     if (!selectedProduct) return;
 
     setIsLoading(true);
+    setError('');
 
-    // Calculate total using CURRENT price - this snapshot is saved to the sale record
-    const unitPrice = selectedProduct.current_price;
+    const unitPrice = Number(selectedProduct.current_price);
     const totalAmount = unitPrice * quantity;
 
-    // Simulate API call - will connect to Supabase later
-    setTimeout(() => {
-      console.log('Sale recorded:', {
-        product_id: selectedProduct.id,
-        quantity,
-        unit_price: unitPrice,
-        total_amount: totalAmount,
-        notes,
-        sold_at: new Date().toISOString(),
-      });
+    const { error: dbError } = await db.sales.create({
+      product_id: selectedProduct.id,
+      quantity,
+      unit_price: unitPrice,
+      total_amount: totalAmount,
+      notes: notes || null,
+      sold_by: null,
+    });
+
+    if (dbError) {
+      setError('Failed to record sale: ' + dbError.message);
       setIsLoading(false);
-      router.push('/admin/sales');
-    }, 1500);
+      return;
+    }
+
+    router.push('/admin/sales');
   };
 
+  if (pageLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
   return (
-    <div>
+    <div className="animate-page-in">
       <div className="flex items-center gap-4 mb-6">
         <Link
           href="/admin/sales"
@@ -66,6 +79,12 @@ export default function RecordSalePage() {
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Record New Sale</h1>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm max-w-2xl">
+          {error}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="max-w-2xl">
         <div className="bg-white rounded-xl shadow-sm p-6 space-y-6">
@@ -81,9 +100,9 @@ export default function RecordSalePage() {
               required
             >
               <option value="">Choose a product...</option>
-              {sampleProducts.map((product) => (
+              {products.map((product) => (
                 <option key={product.id} value={product.id}>
-                  {product.name} - ₱{product.current_price.toFixed(2)} (Stock: {product.stock_quantity})
+                  {product.name} - ₱{Number(product.current_price).toFixed(2)} (Stock: {product.stock_quantity})
                 </option>
               ))}
             </select>
@@ -94,7 +113,7 @@ export default function RecordSalePage() {
             <div className="p-4 bg-gray-50 rounded-lg">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-600">Current Unit Price:</span>
-                <span className="font-semibold text-gray-900">₱{selectedProduct.current_price.toFixed(2)}</span>
+                <span className="font-semibold text-gray-900">₱{Number(selectedProduct.current_price).toFixed(2)}</span>
               </div>
               <p className="text-xs text-gray-500">
                 This price will be saved with the sale record. Future price changes won&apos;t affect this sale&apos;s total.
@@ -141,7 +160,7 @@ export default function RecordSalePage() {
               <div className="flex justify-between items-center">
                 <span className="text-orange-800 font-medium">Total Amount:</span>
                 <span className="text-2xl font-bold text-orange-600">
-                  ₱{(selectedProduct.current_price * quantity).toFixed(2)}
+                  ₱{(Number(selectedProduct.current_price) * quantity).toFixed(2)}
                 </span>
               </div>
             </div>

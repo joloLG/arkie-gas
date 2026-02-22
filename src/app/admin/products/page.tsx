@@ -1,59 +1,53 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, Search, Edit, Trash2, ImageIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Search, Edit, Trash2, ImageIcon, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  current_price: number;
-  stock_quantity: number;
-  image_url: string | null;
-  is_active: boolean;
-}
-
-const sampleProducts: Product[] = [
-  {
-    id: '1',
-    name: '11kg LPG Tank',
-    description: 'Standard 11kg LPG tank for household use',
-    current_price: 850.00,
-    stock_quantity: 25,
-    image_url: null,
-    is_active: true,
-  },
-  {
-    id: '2',
-    name: '5kg LPG Tank',
-    description: 'Compact 5kg LPG tank for small households',
-    current_price: 450.00,
-    stock_quantity: 15,
-    image_url: null,
-    is_active: true,
-  },
-  {
-    id: '3',
-    name: '2.7kg LPG Tank',
-    description: 'Portable 2.7kg LPG tank for camping and small use',
-    current_price: 350.00,
-    stock_quantity: 8,
-    image_url: null,
-    is_active: true,
-  },
-];
+import Image from 'next/image';
+import { db, type Product } from '@/lib/db';
 
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [products] = useState<Product[]>(sampleProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchProducts() {
+      setLoading(true);
+      const { data } = await db.products.getAll();
+      setProducts((data as Product[]) || []);
+      setLoading(false);
+    }
+    fetchProducts();
+  }, []);
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+    setDeletingId(id);
+    const { error } = await db.products.delete(id);
+    if (error) {
+      alert('Failed to delete product: ' + error.message);
+    } else {
+      setProducts(products.filter(p => p.id !== id));
+    }
+    setDeletingId(null);
+  }
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
   return (
-    <div>
+    <div className="animate-page-in">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Products</h1>
         <Link
@@ -98,9 +92,11 @@ export default function ProductsPage() {
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
                       {product.image_url ? (
-                        <img
+                        <Image
                           src={product.image_url}
                           alt={product.name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover rounded-lg"
                         />
                       ) : (
@@ -115,7 +111,7 @@ export default function ProductsPage() {
                 </td>
                 <td className="px-6 py-4">
                   <span className="font-medium text-gray-900">
-                    ₱{product.current_price.toFixed(2)}
+                    ₱{Number(product.current_price).toFixed(2)}
                   </span>
                 </td>
                 <td className="px-6 py-4">
@@ -142,8 +138,16 @@ export default function ProductsPage() {
                     >
                       <Edit className="h-5 w-5" />
                     </Link>
-                    <button className="p-2 text-gray-600 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                      <Trash2 className="h-5 w-5" />
+                    <button
+                      onClick={() => handleDelete(product.id, product.name)}
+                      disabled={deletingId === product.id}
+                      className="p-2 text-gray-600 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {deletingId === product.id ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-5 w-5" />
+                      )}
                     </button>
                   </div>
                 </td>
@@ -151,6 +155,12 @@ export default function ProductsPage() {
             ))}
           </tbody>
         </table>
+
+        {filteredProducts.length === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            {searchQuery ? 'No products match your search.' : 'No products found. Add your first product!'}
+          </div>
+        )}
       </div>
     </div>
   );

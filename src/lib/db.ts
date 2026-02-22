@@ -1,5 +1,4 @@
 import { createClient } from '@/utils/supabase/client';
-import { createClient as createServerClient } from '@/utils/supabase/server';
 
 // Database types based on schema
 export type User = {
@@ -275,30 +274,12 @@ export const db = {
   },
 };
 
-// Server-side helper for authenticated operations
-export const serverDb = {
-  getCurrentUser: async () => {
-    const supabase = await createServerClient();
-    const { data: { user }, error } = await supabase.auth.getUser();
-    return { user, error };
-  },
-  
-  getUserRole: async (userId: string) => {
-    const supabase = await createServerClient();
-    const { data, error } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .single();
-    return { role: data?.role, error };
-  },
-};
 
 // Connection test
 export const testConnection = async () => {
   try {
     const supabase = createClient();
-    const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true });
+    const { error } = await supabase.from('products').select('count', { count: 'exact', head: true });
     
     if (error) {
       console.error('Database connection failed:', error.message);

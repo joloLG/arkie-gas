@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
+          cookiesToSet.forEach(({ name, value }) => {
             request.cookies.set(name, value)
           })
           response = NextResponse.next({
@@ -40,9 +40,22 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if expired - required for Server Components
-  // https://supabase.com/docs/guides/auth/auth-helpers/nextjs#managing-session-with-middleware
-  await supabase.auth.getUser()
+  // Check auth state
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const pathname = request.nextUrl.pathname
+
+  // Protect /admin/* routes - redirect to /login if not authenticated
+  if (pathname.startsWith('/admin') && !user) {
+    const loginUrl = new URL('/login', request.url)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // Redirect authenticated users away from /login and /register to /admin/dashboard
+  if ((pathname === '/login' || pathname === '/register') && user) {
+    const dashboardUrl = new URL('/admin/dashboard', request.url)
+    return NextResponse.redirect(dashboardUrl)
+  }
 
   return response
 }

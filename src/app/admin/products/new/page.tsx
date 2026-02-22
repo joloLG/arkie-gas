@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Upload, X, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { db } from '@/lib/db';
 
 export default function NewProductPage() {
   const router = useRouter();
@@ -14,14 +15,13 @@ export default function NewProductPage() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
-  const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setImage(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -33,16 +33,28 @@ export default function NewProductPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
 
-    // Simulate API call - will connect to Supabase later
-    setTimeout(() => {
+    const { error: dbError } = await db.products.create({
+      name,
+      description: description || null,
+      current_price: parseFloat(price),
+      stock_quantity: parseInt(stock),
+      image_url: null,
+      is_active: true,
+    });
+
+    if (dbError) {
+      setError('Failed to create product: ' + dbError.message);
       setIsLoading(false);
-      router.push('/admin/products');
-    }, 1500);
+      return;
+    }
+
+    router.push('/admin/products');
   };
 
   return (
-    <div>
+    <div className="animate-page-in">
       <div className="flex items-center gap-4 mb-6">
         <Link
           href="/admin/products"
@@ -52,6 +64,12 @@ export default function NewProductPage() {
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Add New Product</h1>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm max-w-2xl">
+          {error}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="max-w-2xl">
         <div className="bg-white rounded-xl shadow-sm p-6 space-y-6">
@@ -78,7 +96,6 @@ export default function NewProductPage() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setImage(null);
                       setImagePreview(null);
                     }}
                     className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
