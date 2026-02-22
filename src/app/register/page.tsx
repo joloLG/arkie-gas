@@ -30,7 +30,7 @@ export default function RegisterPage() {
     }
 
     const supabase = createClient();
-    const { error: authError } = await supabase.auth.signUp({
+    const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -42,6 +42,22 @@ export default function RegisterPage() {
       setError(authError.message);
       setIsLoading(false);
       return;
+    }
+
+    // Insert user data into custom users table
+    if (data.user) {
+      const { error: insertError } = await supabase.from('users').insert({
+        id: data.user.id,
+        email: email,
+        full_name: name,
+        role: 'user',
+      });
+
+      if (insertError) {
+        setError('Account created but failed to save profile: ' + insertError.message);
+        setIsLoading(false);
+        return;
+      }
     }
 
     setIsLoading(false);

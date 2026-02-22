@@ -10,6 +10,16 @@ interface SaleWithProduct extends Sale {
 }
 
 export default function SalesPage() {
+  const [filterType, setFilterType] = useState<'month' | 'range' | 'day' | 'year'>('month');
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear().toString());
+  const [selectedDay, setSelectedDay] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
@@ -25,9 +35,37 @@ export default function SalesPage() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const start = new Date(startDate).toISOString();
-      const end = new Date(endDate + 'T23:59:59').toISOString();
-      const { data } = await db.sales.getAll(start, end);
+      // Calculate date range based on filter type
+      const now = new Date();
+      let start: Date;
+      let end: Date;
+
+      switch (filterType) {
+        case 'month':
+          const [year, month] = selectedMonth.split('-').map(Number);
+          start = new Date(year, month - 1, 1);
+          end = new Date(year, month, 0); // Last day of month
+          break;
+        case 'range':
+          start = new Date(startDate);
+          end = new Date(endDate);
+          break;
+        case 'day':
+          start = new Date(selectedDay);
+          end = new Date(selectedDay);
+          break;
+        case 'year':
+          start = new Date(parseInt(selectedYear), 0, 1);
+          end = new Date(parseInt(selectedYear), 11, 31);
+          break;
+        default:
+          start = new Date(now.getFullYear(), now.getMonth(), 1);
+          end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      }
+
+      const startIso = start.toISOString();
+      const endIso = end.toISOString().replace('T23:59:59.999Z', 'T23:59:59.999Z');
+      const { data } = await db.sales.getAll(startIso, endIso);
       if (!cancelled) {
         setSales((data as SaleWithProduct[]) || []);
         setLoading(false);
@@ -35,11 +73,37 @@ export default function SalesPage() {
     }
     load();
     return () => { cancelled = true; };
-  }, [startDate, endDate]);
+  }, [filterType, selectedMonth, selectedYear, selectedDay, startDate, endDate]);
 
   const totalSales = sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
   const totalQuantity = sales.reduce((sum, sale) => sum + sale.quantity, 0);
   const transactionCount = sales.length;
+
+  const exportToCSV = () => {
+    const headers = ['Date & Time', 'Product', 'Quantity', 'Unit Price', 'Total'];
+    const csvData = sales.map(sale => [
+      new Date(sale.sold_at).toLocaleString('en-PH'),
+      sale.products?.name || 'Unknown',
+      sale.quantity,
+      `₱${Number(sale.unit_price).toFixed(2)}`,
+      `₱${Number(sale.total_amount).toFixed(2)}`
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `sales_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="animate-page-in">
@@ -73,27 +137,86 @@ export default function SalesPage() {
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
         <div className="flex flex-wrap items-center gap-4">
-          {/* Date Range */}
+          {/* Filter Type */}
           <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-gray-400" />
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+            <label className="text-sm font-medium text-gray-700">Filter:</label>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value as 'month' | 'range' | 'day' | 'year')}
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-            <span className="text-gray-400">to</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
+            >
+              <option value="month">Month</option>
+              <option value="range">Range</option>
+              <option value="day">Day</option>
+              <option value="year">Year</option>
+            </select>
           </div>
 
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 ml-auto">
+          {/* Conditional Date Inputs */}
+          {filterType === 'month' && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-gray-400" />
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+          )}
+
+          {filterType === 'range' && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-gray-400" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+              <span className="text-gray-400">to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+          )}
+
+          {filterType === 'day' && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-gray-400" />
+              <input
+                type="date"
+                value={selectedDay}
+                onChange={(e) => setSelectedDay(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+          )}
+
+          {filterType === 'year' && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-gray-400" />
+              <input
+                type="number"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                min="2000"
+                max={new Date().getFullYear() + 1}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 w-24"
+                placeholder="Year"
+              />
+            </div>
+          )}
+
+          <button 
+            onClick={exportToCSV}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 ml-auto"
+          >
             <Download className="h-4 w-4" />
-            Export
+            Export to CSV
           </button>
         </div>
       </div>

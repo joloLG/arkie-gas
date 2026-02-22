@@ -8,7 +8,6 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(255) NOT NULL,
     role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('admin', 'user')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -236,7 +235,17 @@ CREATE POLICY "Authenticated users can view sales" ON sales FOR SELECT TO authen
 CREATE POLICY "Authenticated users can insert sales" ON sales FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Authenticated users can update sales" ON sales FOR UPDATE TO authenticated USING (true);
 
--- Inventory movements policies
-CREATE POLICY "Authenticated users can view inventory movements" ON inventory_movements FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated users can insert inventory movements" ON inventory_movements FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Authenticated users can update inventory movements" ON inventory_movements FOR UPDATE TO authenticated USING (true);
+-- Function to handle new user creation
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, email, full_name, role)
+  VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'full_name', 'Unknown'), 'user');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to automatically insert new auth users into users table
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
