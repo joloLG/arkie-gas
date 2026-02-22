@@ -2,7 +2,30 @@
 
 import { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, Package, Loader2 } from 'lucide-react';
+import { Bar, Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  PointElement,
+} from 'chart.js';
 import { db } from '@/lib/db';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  PointElement
+);
 
 interface MostBoughtProduct {
   product_id: string;
@@ -47,6 +70,44 @@ export default function AnalyticsPage() {
   const totalTransactions = popularProducts.reduce((sum, p) => sum + Number(p.transaction_count), 0);
 
   const topRevenueProducts = [...popularProducts].sort((a, b) => Number(b.total_revenue) - Number(a.total_revenue));
+
+  // Prepare chart data
+  const popularProductsChartData = {
+    labels: popularProducts.slice(0, 5).map(product => product.product_name.length > 15 ? product.product_name.substring(0, 15) + '...' : product.product_name),
+    datasets: [
+      {
+        label: 'Quantity Sold',
+        data: popularProducts.slice(0, 5).map(product => Number(product.total_quantity_sold)),
+        backgroundColor: 'rgba(249, 115, 22, 0.6)',
+        borderColor: 'rgba(249, 115, 22, 1)',
+        borderWidth: 1,
+      },
+      {
+        label: 'Revenue (₱)',
+        data: popularProducts.slice(0, 5).map(product => Number(product.total_revenue)),
+        backgroundColor: 'rgba(34, 197, 94, 0.6)',
+        borderColor: 'rgba(34, 197, 94, 1)',
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const priceChangesChartData = {
+    labels: priceChanges
+      .sort((a, b) => new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime())
+      .map(change => new Date(change.changed_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })),
+    datasets: [
+      {
+        label: 'Price (₱)',
+        data: priceChanges
+          .sort((a, b) => new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime())
+          .map(change => Number(change.new_price)),
+        borderColor: 'rgba(249, 115, 22, 1)',
+        backgroundColor: 'rgba(249, 115, 22, 0.1)',
+        tension: 0.1,
+      },
+    ],
+  };
 
   if (loading) {
     return (
@@ -99,6 +160,31 @@ export default function AnalyticsPage() {
           <p className="text-2xl font-bold text-gray-900">
             {totalTransactions > 0 ? `₱${(totalRevenue / totalTransactions).toFixed(2)}` : '₱0.00'}
           </p>
+        </div>
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid lg:grid-cols-2 gap-6 mb-6">
+        {/* Popular Products Bar Chart */}
+        <div className="bg-white rounded-xl shadow-sm">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Product Sales Chart</h2>
+            <p className="text-sm text-gray-500">Top 5 products by quantity sold</p>
+          </div>
+          <div className="p-6">
+            <Bar data={popularProductsChartData} options={{ responsive: true, plugins: { legend: { position: 'top' } } }} />
+          </div>
+        </div>
+
+        {/* Price Changes Line Chart */}
+        <div className="bg-white rounded-xl shadow-sm">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Price Changes Over Time</h2>
+            <p className="text-sm text-gray-500">Historical price adjustments</p>
+          </div>
+          <div className="p-6">
+            <Line data={priceChangesChartData} options={{ responsive: true, plugins: { legend: { position: 'top' } } }} />
+          </div>
         </div>
       </div>
 
