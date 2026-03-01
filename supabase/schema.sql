@@ -249,3 +249,12 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+
+
+-- Delete from dependent tables first
+DELETE FROM sales;
+DELETE FROM inventory_movements;
+DELETE FROM price_history;
+DELETE FROM products;
+DELETE FROM users;
