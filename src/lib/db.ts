@@ -14,8 +14,10 @@ export type User = {
 export type Product = {
   id: string;
   name: string;
+  brand: string | null;
   description: string | null;
-  current_price: number;
+  base_price: number; // Changed from bought_price to match database
+  current_selling_price: number; // Changed from current_price to match database
   image_url: string | null;
   stock_quantity: number;
   is_active: boolean;
@@ -35,18 +37,60 @@ export type PriceHistory = {
 export type Sale = {
   id: string;
   product_id: string;
+  customer_id: string | null;
   quantity: number;
-  unit_price: number; // Price at time of sale (snapshot)
+  unit_price: number;
+  bought_price: number;
   total_amount: number;
+  profit: number;
+  empty_tanks_returned: number;
+  empty_tanks_borrowed: number;
+  sale_type: 'cash' | 'credit';
+  credit_amount: number;
+  is_credit_paid: boolean;
   sold_by: string | null;
   sold_at: string;
   notes: string | null;
 };
 
+export type Customer = {
+  id: string;
+  name: string;
+  contact_number: string | null;
+  address: string | null;
+  total_credit: number;
+  credit_limit: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreditPayment = {
+  id: string;
+  sale_id: string;
+  customer_id: string;
+  amount_paid: number;
+  payment_date: string;
+  payment_method: string | null;
+  notes: string | null;
+  created_by: string | null;
+};
+
+export type EmptyTankReturn = {
+  id: string;
+  sale_id: string | null;
+  customer_id: string;
+  product_id: string;
+  quantity_returned: number;
+  return_date: string;
+  notes: string | null;
+  created_by: string | null;
+};
+
 export type InventoryMovement = {
   id: string;
   product_id: string;
-  movement_type: 'in' | 'out' | 'adjustment';
+  movement_type: 'in' | 'out' | 'adjustment' | 'empty_tank_in' | 'empty_tank_out';
   quantity: number;
   previous_stock: number;
   new_stock: number;
@@ -115,7 +159,7 @@ export const db = {
       const supabase = createClient();
       let query = supabase
         .from('sales')
-        .select('*, products(name)')
+        .select('*, products(name, brand), customers(name)')
         .order('sold_at', { ascending: false });
       
       if (startDate) {
@@ -132,12 +176,24 @@ export const db = {
     create: async (sale: Omit<Sale, 'id' | 'sold_at'>) => {
       const supabase = createClient();
       
-      // Calculate total based on current unit price
+      // Calculate total and profit
       const total_amount = sale.unit_price * sale.quantity;
+      const profit = (sale.unit_price - sale.bought_price) * sale.quantity;
       
       const { data, error } = await supabase
         .from('sales')
-        .insert({ ...sale, total_amount })
+        .insert({ ...sale, total_amount, profit })
+        .select()
+        .single();
+      return { data, error };
+    },
+    
+    update: async (id: string, updates: Partial<Sale>) => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('sales')
+        .update(updates)
+        .eq('id', id)
         .select()
         .single();
       return { data, error };
@@ -162,6 +218,114 @@ export const db = {
         .select('*')
         .gte('sale_month', startDate)
         .lt('sale_month', endDate);
+      return { data, error };
+    },
+  },
+
+  // Customers
+  customers: {
+    getAll: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .order('name', { ascending: true });
+      return { data, error };
+    },
+    
+    getById: async (id: string) => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', id)
+        .single();
+      return { data, error };
+    },
+    
+    create: async (customer: Omit<Customer, 'id' | 'created_at' | 'updated_at'>) => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('customers')
+        .insert(customer)
+        .select()
+        .single();
+      return { data, error };
+    },
+    
+    update: async (id: string, updates: Partial<Customer>) => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('customers')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      return { data, error };
+    },
+    
+    delete: async (id: string) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', id);
+      return { error };
+    },
+  },
+
+  // Credit Payments
+  creditPayments: {
+    getAll: async (customerId?: string) => {
+      const supabase = createClient();
+      let query = supabase
+        .from('credit_payments')
+        .select('*, customers(name), sales(total_amount)')
+        .order('payment_date', { ascending: false });
+      
+      if (customerId) {
+        query = query.eq('customer_id', customerId);
+      }
+      
+      const { data, error } = await query;
+      return { data, error };
+    },
+    
+    create: async (payment: Omit<CreditPayment, 'id' | 'payment_date'>) => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('credit_payments')
+        .insert(payment)
+        .select()
+        .single();
+      return { data, error };
+    },
+  },
+
+  // Empty Tank Returns
+  emptyTankReturns: {
+    getAll: async (customerId?: string) => {
+      const supabase = createClient();
+      let query = supabase
+        .from('empty_tank_returns')
+        .select('*, customers(name), products(name, brand)')
+        .order('return_date', { ascending: false });
+      
+      if (customerId) {
+        query = query.eq('customer_id', customerId);
+      }
+      
+      const { data, error } = await query;
+      return { data, error };
+    },
+    
+    create: async (returnRecord: Omit<EmptyTankReturn, 'id' | 'return_date'>) => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('empty_tank_returns')
+        .insert(returnRecord)
+        .select()
+        .single();
       return { data, error };
     },
   },
@@ -269,6 +433,42 @@ export const db = {
         .from('yearly_sales_summary')
         .select('*')
         .eq('sale_year', `${year}-01-01`);
+      return { data, error };
+    },
+    
+    getCustomerCreditSummary: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('customer_credit_summary')
+        .select('*')
+        .order('outstanding_credit', { ascending: false });
+      return { data, error };
+    },
+    
+    getEmptyTankSummary: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('empty_tank_summary')
+        .select('*')
+        .order('outstanding_empty_tanks', { ascending: false });
+      return { data, error };
+    },
+    
+    getProfitAnalysis: async (startDate?: string, endDate?: string) => {
+      const supabase = createClient();
+      let query = supabase
+        .from('profit_analysis')
+        .select('*')
+        .order('sale_date', { ascending: false });
+      
+      if (startDate) {
+        query = query.gte('sale_date', startDate);
+      }
+      if (endDate) {
+        query = query.lte('sale_date', endDate);
+      }
+      
+      const { data, error } = await query;
       return { data, error };
     },
   },

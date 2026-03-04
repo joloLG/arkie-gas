@@ -1,4 +1,4 @@
-import { Flame, Mail, MapPin, Phone } from "lucide-react";
+import { Flame, Mail, MapPin, Phone, Users } from "lucide-react";
 import Link from "next/link";
 
 export function Footer() {
@@ -23,6 +23,7 @@ export function Footer() {
               <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
               <li><Link href="/services" className="hover:text-white transition-colors">Services</Link></li>
               <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+              <li><Link href="/admin/customer-accounts" className="hover:text-white transition-colors">Manage Customers</Link></li>
             </ul>
           </div>
           

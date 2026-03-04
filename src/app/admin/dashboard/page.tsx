@@ -3,94 +3,112 @@
 import { useEffect, useState } from 'react';
 import { 
   DollarSign, 
-  Package, 
+  PackageOpen, 
   ShoppingCart, 
   TrendingUp,
-  Loader2
+  Loader2,
+  Users,
+  AlertCircle,
+  ArrowRight
 } from "lucide-react";
 import Link from 'next/link';
-import { db, type Product, type Sale } from '@/lib/db';
+import { db } from '@/lib/db-complete';
 
-interface SaleWithProduct extends Sale {
-  products: { name: string } | null;
+interface DashboardStats {
+  todaySales: number;
+  todayProfit: number;
+  totalCredit: number;
+  totalTanks: number;
+  availableTanks: number;
 }
 
 export default function AdminDashboard() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [recentSales, setRecentSales] = useState<SaleWithProduct[]>([]);
-  const [todaySalesTotal, setTodaySalesTotal] = useState(0);
-  const [todayQuantity, setTodayQuantity] = useState(0);
+  const [stats, setStats] = useState<DashboardStats>({
+    todaySales: 0,
+    todayProfit: 0,
+    totalCredit: 0,
+    totalTanks: 0,
+    availableTanks: 0,
+  });
   const [loading, setLoading] = useState(true);
-  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    async function fetchData() {
+    async function fetchDashboardStats() {
       setLoading(true);
-      setNow(Date.now());
-
-      // Fetch products
-      const { data: productsData } = await db.products.getAll();
-      const allProducts = (productsData as Product[]) || [];
-      setProducts(allProducts);
-
-      // Fetch today's sales
-      const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
-      const { data: salesData } = await db.sales.getAll(startOfDay, endOfDay);
-      const todaySales = (salesData as SaleWithProduct[]) || [];
-
-      setTodaySalesTotal(todaySales.reduce((sum, s) => sum + Number(s.total_amount), 0));
-      setTodayQuantity(todaySales.reduce((sum, s) => sum + s.quantity, 0));
-
-      // Fetch recent 10 sales (no date filter)
-      const { data: recentData } = await db.sales.getAll();
-      setRecentSales(((recentData as SaleWithProduct[]) || []).slice(0, 8));
-
+      const result = await db.analytics.getDashboardStats();
+      if (result) {
+        setStats(result as DashboardStats);
+      }
       setLoading(false);
     }
-    fetchData();
+    fetchDashboardStats();
   }, []);
 
-  const lowStockItems = products.filter(p => p.stock_quantity < 10 && p.is_active);
-
-  const stats = [
+  const statsCards = [
     {
-      title: "Total Sales Today",
-      value: `₱${todaySalesTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
+      title: "Today's Sales",
+      value: `₱${stats.todaySales.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
       icon: DollarSign,
       color: 'bg-green-100 text-green-600',
+      description: "Total sales today",
     },
     {
-      title: "Products Sold Today",
-      value: `${todayQuantity}`,
-      icon: ShoppingCart,
-      color: 'bg-blue-100 text-blue-600',
-    },
-    {
-      title: "Total Products",
-      value: `${products.filter(p => p.is_active).length}`,
-      icon: Package,
-      color: 'bg-purple-100 text-purple-600',
-    },
-    {
-      title: "Low Stock Items",
-      value: `${lowStockItems.length}`,
+      title: "Today's Profit",
+      value: `₱${stats.todayProfit.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
       icon: TrendingUp,
+      color: 'bg-blue-100 text-blue-600',
+      description: "Profit earned today",
+    },
+    {
+      title: "Total Loans",
+      value: `₱${stats.totalCredit.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
+      icon: Users,
+      color: 'bg-orange-100 text-orange-600',
+      description: "Outstanding customer loans",
+      clickable: true,
+      href: "/admin/customer-credits",
+    },
+    {
+      title: "Unreturned Tanks",
+      value: `${stats.totalTanks}`,
+      icon: AlertCircle,
       color: 'bg-red-100 text-red-600',
+      description: "Tanks not returned yet",
+      clickable: true,
+      href: "/admin/customer-tanks",
     },
   ];
 
-  function timeAgo(dateStr: string) {
-    const diff = now - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins} min${mins > 1 ? 's' : ''} ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    const days = Math.floor(hours / 24);
-    return `${days} day${days > 1 ? 's' : ''} ago`;
-  }
+  const quickActions = [
+    {
+      title: "Record Sale",
+      description: "Add a new sale transaction",
+      icon: ShoppingCart,
+      href: "/admin/record-sale",
+      color: "bg-orange-500 hover:bg-orange-600",
+    },
+    {
+      title: "Sales Tracking",
+      description: "View sales reports and analytics",
+      icon: TrendingUp,
+      href: "/admin/sales-tracking",
+      color: "bg-blue-500 hover:bg-blue-600",
+    },
+    {
+      title: "Inventory",
+      description: "Manage products and stock",
+      icon: PackageOpen,
+      href: "/admin/inventory",
+      color: "bg-green-500 hover:bg-green-600",
+    },
+    {
+      title: "Customer Credits",
+      description: "Manage customer loans",
+      icon: Users,
+      href: "/admin/customer-credits",
+      color: "bg-purple-500 hover:bg-purple-600",
+    },
+  ];
 
   if (loading) {
     return (
@@ -102,84 +120,86 @@ export default function AdminDashboard() {
 
   return (
     <div className="animate-page-in">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Main Dashboard</h1>
+        <p className="text-gray-600">Welcome to Arkie Gasul Management System</p>
+      </div>
       
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat, index) => (
-          <div key={stat.title} className={`bg-white rounded-xl p-6 shadow-sm animate-slide-up stagger-${index + 1}`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className={`p-2 rounded-lg ${stat.color}`}>
-                <stat.icon className="h-5 w-5" />
+        {statsCards.map((stat, index) => (
+          <Link
+            key={stat.title}
+            href={stat.clickable ? stat.href || "#" : "#"}
+            className={`block ${stat.clickable ? 'hover:scale-105 transition-transform cursor-pointer' : ''}`}
+          >
+            <div className={`bg-white rounded-xl p-6 shadow-sm animate-slide-up stagger-${index + 1} ${
+              stat.clickable ? 'hover:shadow-md' : ''
+            }`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className={`p-2 rounded-lg ${stat.color}`}>
+                  <stat.icon className="h-5 w-5" />
+                </div>
+                {stat.clickable && (
+                  <ArrowRight className="h-4 w-4 text-gray-400" />
+                )}
               </div>
+              <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+              <p className="text-sm text-gray-600">{stat.title}</p>
+              <p className="text-xs text-gray-500 mt-1">{stat.description}</p>
             </div>
-            <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-            <p className="text-sm text-gray-600">{stat.title}</p>
-          </div>
+          </Link>
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Recent Sales */}
-        <div className="bg-white rounded-xl shadow-sm animate-slide-up stagger-5">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Sales</h2>
+      {/* Available Tanks Summary */}
+      <div className="bg-linear-to-r from-orange-500 to-orange-600 rounded-xl p-6 mb-8 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold mb-1">Available Tanks</h3>
+            <p className="text-3xl font-bold">{stats.availableTanks}</p>
+            <p className="text-orange-100 text-sm mt-1">Total tanks ready for sale</p>
           </div>
-          <div className="p-6">
-            {recentSales.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No sales recorded yet.</p>
-            ) : (
-              <div className="space-y-4">
-                {recentSales.map((sale) => (
-                  <div key={sale.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                    <div>
-                      <p className="font-medium text-gray-900">{sale.products?.name || 'Unknown'}</p>
-                      <p className="text-sm text-gray-500">{sale.quantity} item(s) • {timeAgo(sale.sold_at)}</p>
-                    </div>
-                    <span className="font-semibold text-gray-900">₱{Number(sale.total_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="bg-white/20 rounded-lg p-4">
+            <PackageOpen className="h-8 w-8" />
           </div>
         </div>
+      </div>
 
-        {/* Quick Actions */}
-        <div className="bg-white rounded-xl shadow-sm animate-slide-up stagger-6">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-2 gap-4">
-              <Link 
-                href="/admin/products/new" 
-                className="p-4 bg-gray-50 rounded-lg hover:bg-orange-50 transition-colors text-center"
-              >
-                <Package className="h-6 w-6 text-orange-500 mx-auto mb-2" />
-                <span className="text-sm font-medium text-gray-900">Add Product</span>
-              </Link>
-              <Link 
-                href="/admin/sales/new" 
-                className="p-4 bg-gray-50 rounded-lg hover:bg-orange-50 transition-colors text-center"
-              >
-                <ShoppingCart className="h-6 w-6 text-orange-500 mx-auto mb-2" />
-                <span className="text-sm font-medium text-gray-900">Record Sale</span>
-              </Link>
-              <Link 
-                href="/admin/inventory" 
-                className="p-4 bg-gray-50 rounded-lg hover:bg-orange-50 transition-colors text-center"
-              >
-                <TrendingUp className="h-6 w-6 text-orange-500 mx-auto mb-2" />
-                <span className="text-sm font-medium text-gray-900">View Inventory</span>
-              </Link>
-              <Link 
-                href="/admin/analytics" 
-                className="p-4 bg-gray-50 rounded-lg hover:bg-orange-50 transition-colors text-center"
-              >
-                <DollarSign className="h-6 w-6 text-orange-500 mx-auto mb-2" />
-                <span className="text-sm font-medium text-gray-900">View Analytics</span>
-              </Link>
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {quickActions.map((action, index) => (
+          <Link
+            key={action.title}
+            href={action.href}
+            className="group"
+          >
+            <div className={`bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-200 animate-slide-up stagger-${index + 5}`}>
+              <div className={`w-12 h-12 ${action.color} rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                <action.icon className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">{action.title}</h3>
+              <p className="text-sm text-gray-600">{action.description}</p>
             </div>
+          </Link>
+        ))}
+      </div>
+
+      {/* System Status */}
+      <div className="mt-8 bg-white rounded-xl p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">System Status</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            <span className="text-sm text-gray-600">Database Connected</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            <span className="text-sm text-gray-600">All Systems Operational</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+            <span className="text-sm text-gray-600">Live Data</span>
           </div>
         </div>
       </div>

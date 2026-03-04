@@ -13,8 +13,11 @@ export default function NewProductPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [name, setName] = useState('');
+  const [brand, setBrand] = useState('');
   const [price, setPrice] = useState('');
+  const [boughtPrice, setBoughtPrice] = useState('');
   const [stock, setStock] = useState('');
+  const [emptyTankStock, setEmptyTankStock] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -67,9 +70,12 @@ export default function NewProductPage() {
 
     const { error: dbError } = await db.products.create({
       name,
+      brand: brand || null,
       description: null,
       current_price: parseFloat(price),
+      bought_price: parseFloat(boughtPrice) || 0,
       stock_quantity: parseInt(stock),
+      empty_tank_stock: parseInt(emptyTankStock) || 0,
       image_url: imageUrl,
       is_active: true,
     });
@@ -166,11 +172,26 @@ export default function NewProductPage() {
             />
           </div>
 
-          {/* Price and Stock */}
+          {/* Brand */}
+          <div>
+            <label htmlFor="brand" className="block text-sm font-medium text-gray-700 mb-2">
+              Brand
+            </label>
+            <input
+              id="brand"
+              type="text"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              placeholder="e.g., Shell, Petron"
+            />
+          </div>
+
+          {/* Price and Bought Price */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
-                Price (₱) *
+                Selling Price (₱) *
               </label>
               <input
                 id="price"
@@ -185,6 +206,26 @@ export default function NewProductPage() {
               />
             </div>
             <div>
+              <label htmlFor="boughtPrice" className="block text-sm font-medium text-gray-700 mb-2">
+                Bought Price (₱) *
+              </label>
+              <input
+                id="boughtPrice"
+                type="number"
+                step="0.01"
+                min="0"
+                value={boughtPrice}
+                onChange={(e) => setBoughtPrice(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="0.00"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Stock and Empty Tank Stock */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
               <label htmlFor="stock" className="block text-sm font-medium text-gray-700 mb-2">
                 Initial Stock *
               </label>
@@ -197,6 +238,20 @@ export default function NewProductPage() {
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 placeholder="0"
                 required
+              />
+            </div>
+            <div>
+              <label htmlFor="emptyTankStock" className="block text-sm font-medium text-gray-700 mb-2">
+                Empty Tank Stock
+              </label>
+              <input
+                id="emptyTankStock"
+                type="number"
+                min="0"
+                value={emptyTankStock}
+                onChange={(e) => setEmptyTankStock(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="0"
               />
             </div>
           </div>

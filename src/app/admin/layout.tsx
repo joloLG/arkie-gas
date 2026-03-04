@@ -6,22 +6,26 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   LayoutDashboard, 
-  Package, 
+  PackageOpen, 
   ShoppingCart, 
   BarChart3, 
   LogOut,
   Menu,
   X,
-  Warehouse
+  Warehouse,
+  PlusCircle,
+  Users,
+  AlertTriangle
 } from "lucide-react";
 import { createClient } from '@/utils/supabase/client';
 
 const sidebarLinks = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/products", label: "Products", icon: Package },
-  { href: "/admin/sales", label: "Sales", icon: ShoppingCart },
-  { href: "/admin/inventory", label: "Inventory", icon: Warehouse },
-  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/admin/dashboard", label: "Main Dashboard", icon: LayoutDashboard },
+  { href: "/admin/record-sale", label: "Record Sale", icon: PlusCircle },
+  { href: "/admin/sales-tracking", label: "Sales Tracking", icon: ShoppingCart },
+  { href: "/admin/inventory", label: "Inventory Tracking", icon: Warehouse },
+  { href: "/admin/customer-credits", label: "Customer List (CL)", icon: Users },
+  { href: "/admin/customer-tanks", label: "Customer List (TR)", icon: AlertTriangle },
 ];
 
 export default function AdminLayout({
@@ -44,7 +48,12 @@ export default function AdminLayout({
 
   const isActive = (href: string) => {
     if (href === '/admin/dashboard') return pathname === href;
-    return pathname?.startsWith(href);
+    if (href === '/admin/record-sale') return pathname === href;
+    if (href === '/admin/sales-tracking') return pathname?.startsWith(href);
+    if (href === '/admin/inventory') return pathname?.startsWith(href);
+    if (href === '/admin/customer-credits') return pathname?.startsWith(href);
+    if (href === '/admin/customer-tanks') return pathname?.startsWith(href);
+    return false;
   };
 
   return (
