@@ -43,6 +43,7 @@ export default function EmptyTanksPage() {
     e.preventDefault();
     
     const { error } = await db.emptyTankReturns.create({
+      sale_id: null, // General return, not tied to specific sale
       customer_id: newReturn.customer_id,
       product_id: newReturn.product_id,
       quantity_returned: newReturn.quantity_returned,

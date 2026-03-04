@@ -43,8 +43,8 @@ export default function RecordSalePage() {
 
   useEffect(() => {
     if (selectedProduct) {
-      setBoughtPrice(selectedProduct.bought_price || 0);
-      setSellingPrice(Number(selectedProduct.current_price));
+      setBoughtPrice(selectedProduct.base_price || 0);
+      setSellingPrice(Number(selectedProduct.current_selling_price));
     }
   }, [selectedProduct]);
 
@@ -160,7 +160,7 @@ export default function RecordSalePage() {
               <option value="">Choose a product...</option>
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
-                  {product.name} {product.brand && `(${product.brand})`} - ₱{Number(product.current_price).toFixed(2)} (Stock: {product.stock_quantity})
+                  {product.name} {product.brand && `(${product.brand})`} - ₱{Number(product.current_selling_price).toFixed(2)} (Stock: {product.stock_quantity})
                 </option>
               ))}
             </select>
@@ -385,7 +385,7 @@ export default function RecordSalePage() {
                     <Plus className="h-5 w-5" />
                   </button>
                   <span className="text-sm text-gray-500">
-                    Available: {selectedProduct.empty_tank_stock || 0} tanks
+                    Available: {selectedProduct.stock_quantity || 0} units
                   </span>
                 </div>
               </div>

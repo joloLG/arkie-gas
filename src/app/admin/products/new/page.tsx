@@ -72,10 +72,9 @@ export default function NewProductPage() {
       name,
       brand: brand || null,
       description: null,
-      current_price: parseFloat(price),
-      bought_price: parseFloat(boughtPrice) || 0,
+      current_selling_price: parseFloat(price),
+      base_price: parseFloat(boughtPrice) || 0,
       stock_quantity: parseInt(stock),
-      empty_tank_stock: parseInt(emptyTankStock) || 0,
       image_url: imageUrl,
       is_active: true,
     });

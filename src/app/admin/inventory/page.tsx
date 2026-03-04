@@ -31,7 +31,16 @@ export default function InventoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    brand: string;
+    description: string | null;
+    current_selling_price: number;
+    base_price: number;
+    image_url: string | null;
+    stock_quantity: number;
+    is_active: boolean;
+  }>({
     name: '',
     brand: '', // Make brand required to match database schema
     description: null,
@@ -118,7 +127,7 @@ export default function InventoryPage() {
       description: product.description,
       current_selling_price: product.current_selling_price, // Updated
       base_price: product.base_price, // Updated
-      image_url: product.image_url,
+      image_url: product.image_url || null,
       stock_quantity: product.stock_quantity,
       is_active: product.is_active,
     });

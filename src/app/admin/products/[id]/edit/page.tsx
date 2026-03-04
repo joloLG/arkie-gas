@@ -35,7 +35,7 @@ export default function EditProductPage() {
       const prod = data as Product;
       setProduct(prod);
       setName(prod.name);
-      setPrice(prod.current_price.toString());
+      setPrice(prod.current_selling_price.toString());
       setStock(prod.stock_quantity.toString());
       setImagePreview(prod.image_url);
       setLoading(false);
@@ -92,7 +92,7 @@ export default function EditProductPage() {
 
     const { error: dbError } = await db.products.update(product.id, {
       name,
-      current_price: parseFloat(price),
+      current_selling_price: parseFloat(price),
       stock_quantity: parseInt(stock),
       image_url: imageUrl,
       is_active: true,

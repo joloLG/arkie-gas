@@ -111,7 +111,7 @@ export default function ProductsPage() {
                 </td>
                 <td className="px-6 py-4">
                   <span className="font-medium text-gray-900">
-                    ₱{Number(product.current_price).toFixed(2)}
+                    ₱{Number(product.current_selling_price).toFixed(2)}
                   </span>
                 </td>
                 <td className="px-6 py-4">

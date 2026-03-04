@@ -39,14 +39,22 @@ export default function RecordSalePage() {
     setIsLoading(true);
     setError('');
 
-    const unitPrice = Number(selectedProduct.current_price);
+    const unitPrice = Number(selectedProduct.current_selling_price);
     const totalAmount = unitPrice * quantity;
 
     const { error: dbError } = await db.sales.create({
       product_id: selectedProduct.id,
+      customer_id: null, // No customer selected in this simplified version
       quantity,
       unit_price: unitPrice,
+      bought_price: selectedProduct.base_price || 0,
       total_amount: totalAmount,
+      profit: unitPrice - (selectedProduct.base_price || 0),
+      empty_tanks_returned: 0,
+      empty_tanks_borrowed: 0,
+      sale_type: 'cash',
+      credit_amount: 0,
+      is_credit_paid: true,
       notes: notes || null,
       sold_by: null,
     });
@@ -102,7 +110,7 @@ export default function RecordSalePage() {
               <option value="">Choose a product...</option>
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
-                  {product.name} - ₱{Number(product.current_price).toFixed(2)} (Stock: {product.stock_quantity})
+                  {product.name} - ₱{Number(product.current_selling_price).toFixed(2)} (Stock: {product.stock_quantity})
                 </option>
               ))}
             </select>
@@ -113,7 +121,7 @@ export default function RecordSalePage() {
             <div className="p-4 bg-gray-50 rounded-lg">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-600">Current Unit Price:</span>
-                <span className="font-semibold text-gray-900">₱{Number(selectedProduct.current_price).toFixed(2)}</span>
+                <span className="font-semibold text-gray-900">₱{Number(selectedProduct.current_selling_price).toFixed(2)}</span>
               </div>
               <p className="text-xs text-gray-500">
                 This price will be saved with the sale record. Future price changes won&apos;t affect this sale&apos;s total.
@@ -160,7 +168,7 @@ export default function RecordSalePage() {
               <div className="flex justify-between items-center">
                 <span className="text-orange-800 font-medium">Total Amount:</span>
                 <span className="text-2xl font-bold text-orange-600">
-                  ₱{(Number(selectedProduct.current_price) * quantity).toFixed(2)}
+                  ₱{(Number(selectedProduct.current_selling_price) * quantity).toFixed(2)}
                 </span>
               </div>
             </div>

@@ -8,6 +8,7 @@ export default function CustomerTanksPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [customers, setCustomers] = useState<CustomerTankSummary[]>([]);
   const [returns, setReturns] = useState<{ [key: string]: TankReturn[] }>({});
+  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerTankSummary | null>(null);
@@ -18,9 +19,13 @@ export default function CustomerTanksPage() {
   useEffect(() => {
     async function fetchCustomers() {
       setLoading(true);
-      const { data } = await db.analytics.getCustomerTankSummary();
-      const customerList = (data as CustomerTankSummary[]) || [];
+      const [customerListResult, productsResult] = await Promise.all([
+        db.analytics.getCustomerTankSummary(),
+        db.products.getAll()
+      ]);
+      const customerList = (customerListResult.data as CustomerTankSummary[]) || [];
       setCustomers(customerList);
+      setProducts((productsResult.data as any[]) || []);
 
       // Fetch return history for each customer
       const returnsData: { [key: string]: TankReturn[] } = {};
@@ -56,10 +61,11 @@ export default function CustomerTanksPage() {
       }
 
       // Record tank return
+      const defaultProduct = products.length > 0 ? products[0].id : '';
       const { error } = await db.tankReturns.create({
         customer_id: selectedCustomer.customer_id,
         sale_id: null, // General return
-        product_id: selectedCustomer.product_id || null, // Use actual product_id or null
+        product_id: defaultProduct, // Use first available product
         quantity_returned: quantity,
         notes: returnNotes.trim() || null,
         recorded_by: null,
