@@ -5,6 +5,8 @@ import { Plus, Minus, AlertTriangle, History, PackageOpen, Loader2, Edit, Users,
 import Link from 'next/link';
 import Image from 'next/image';
 import { db, type Product, type InventoryMovement, type Sale, type Customer } from '@/lib/db';
+import { useOptimizedData, fetchParallel } from '@/hooks/useOptimizedData';
+import { TableSkeleton, FormSkeleton } from '@/components/ui/Skeleton';
 
 interface MovementWithProduct extends InventoryMovement {
   products: { name: string } | null;
@@ -53,23 +55,44 @@ export default function InventoryPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  // Use optimized data fetching
+  const { data: productsData, loading: productsLoading, error: productsError, refetch: refetchProducts } = useOptimizedData(
+    'inventory-products',
+    async () => {
+      const result = await db.products.getAll();
+      return { data: result };
+    },
+    []
+  );
+
+  const { data: movementsData, loading: movementsLoading, refetch: refetchMovements } = useOptimizedData(
+    'inventory-movements',
+    async () => {
+      const result = await db.inventory.getMovements();
+      return { data: result };
+    },
+    []
+  );
+
+  const { data: salesData, loading: salesLoading } = useOptimizedData(
+    'inventory-sales',
+    async () => {
+      const result = await db.sales.getAll();
+      return { data: result };
+    },
+    []
+  );
+
+  const dataLoading = productsLoading || movementsLoading || salesLoading;
+
+  // Update state with fetched data
   useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      const [productsRes, movementsRes, salesRes] = await Promise.all([
-        db.products.getAll(),
-        db.inventory.getMovements(),
-        db.sales.getAll()
-      ]);
-      setProducts((productsRes.data as Product[]) || []);
-      setMovements(((movementsRes.data as MovementWithProduct[]) || []).slice(0, 15));
-      setSales(((salesRes.data as SaleWithCustomer[]) || []).filter(sale => 
-        (sale.empty_tanks_borrowed || 0) > (sale.empty_tanks_returned || 0)
-      ));
-      setLoading(false);
-    }
-    loadData();
-  }, []);
+    if (productsData?.data) setProducts(productsData.data as Product[]);
+    if (movementsData?.data) setMovements((movementsData.data as MovementWithProduct[]).slice(0, 15));
+    if (salesData?.data) setSales((salesData.data as SaleWithCustomer[]).filter(sale => 
+      (sale.empty_tanks_borrowed || 0) > (sale.empty_tanks_returned || 0)
+    ));
+  }, [productsData, movementsData, salesData]);
 
   const lowStockProducts = products.filter(p => p.is_active && p.stock_quantity < 10);
   const todayMovements = movements.filter(m => {
@@ -153,12 +176,13 @@ export default function InventoryPage() {
     }
 
     // Refresh data
-    const [productsRes, movementsRes] = await Promise.all([
-      db.products.getAll(),
-      db.inventory.getMovements()
+    await Promise.all([
+      refetchProducts(),
+      refetchMovements()
     ]);
+    // Re-fetch to update local state
+    const [productsRes] = await Promise.all([db.products.getAll()]);
     setProducts((productsRes.data as Product[]) || []);
-    setMovements(((movementsRes.data as MovementWithProduct[]) || []).slice(0, 15));
     setAdjusting(false);
     setShowAdjustmentModal(false);
   };
@@ -181,12 +205,13 @@ export default function InventoryPage() {
     }
 
     // Refresh data
-    const [productsRes, movementsRes] = await Promise.all([
-      db.products.getAll(),
-      db.inventory.getMovements()
+    await Promise.all([
+      refetchProducts(),
+      refetchMovements()
     ]);
+    // Re-fetch to update local state
+    const [productsRes] = await Promise.all([db.products.getAll()]);
     setProducts((productsRes.data as Product[]) || []);
-    setMovements(((movementsRes.data as MovementWithProduct[]) || []).slice(0, 15));
     setAdjusting(false);
     setShowEditModal(false);
   };
@@ -296,10 +321,45 @@ export default function InventoryPage() {
     (product.brand && product.brand.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  if (loading) {
+  if (dataLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      <div className="animate-page-in">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Inventory Management</h1>
+          <p className="text-gray-600">Manage products and stock levels</p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          <FormSkeleton />
+          <TableSkeleton rows={5} columns={4} />
+          <TableSkeleton rows={10} columns={6} />
+        </div>
+      </div>
+    );
+  }
+
+  if (productsError) {
+    return (
+      <div className="animate-page-in">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Inventory Management</h1>
+          <p className="text-gray-600">Manage products and stock levels</p>
+        </div>
+
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-red-800 mb-2">Error Loading Inventory</h2>
+          <p className="text-red-600">Please try refreshing the page or contact support.</p>
+          <button 
+            onClick={() => {
+              refetchProducts();
+              refetchMovements();
+            }}
+            className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }

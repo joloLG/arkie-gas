@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Download, Calendar, Loader2, TrendingUp, TrendingDown, DollarSign, PackageOpen, Users } from 'lucide-react';
+import { Download, Calendar, Loader2, TrendingUp, TrendingDown, DollarSign, PackageOpen, Users, AlertCircle } from 'lucide-react';
 import { Bar, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -15,6 +15,8 @@ import {
   PointElement,
 } from 'chart.js';
 import { db } from '@/lib/db-complete';
+import { useOptimizedData, fetchParallel } from '@/hooks/useOptimizedData';
+import { TableSkeleton, ChartSkeleton } from '@/components/ui/Skeleton';
 
 ChartJS.register(
   CategoryScale,
@@ -33,6 +35,7 @@ interface SaleWithDetails {
   brand: string | null;
   product_name: string | null;
   payment_type: 'cash' | 'credit';
+  is_credit_paid: boolean;
   base_price: number;
   customer_price: number;
   profit: number;
@@ -61,16 +64,29 @@ export default function SalesTrackingPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
 
-  const [sales, setSales] = useState<SaleWithDetails[]>([]);
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [yearlyData, setYearlyData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Use optimized data fetching for analytics data
+  const { data: monthlyData, loading: monthlyLoading } = useOptimizedData(
+    'monthly-summary',
+    async () => {
+      const result = await db.analytics.getMonthlySummary();
+      return result;
+    },
+    [filterType]
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadData() {
-      setLoading(true);
-      
+  const { data: yearlyData, loading: yearlyLoading } = useOptimizedData(
+    'yearly-summary', 
+    async () => {
+      const result = await db.analytics.getYearlySummary();
+      return result;
+    },
+    [filterType]
+  );
+
+  // Optimized sales fetching with date range
+  const { data: sales, loading: salesLoading, error: salesError, refetch: refetchSales } = useOptimizedData(
+    `sales-${filterType}-${selectedMonth}-${selectedYear}-${selectedDay}-${startDate}-${endDate}`,
+    async () => {
       // Calculate date range based on filter type
       const now = new Date();
       let start: Date;
@@ -102,46 +118,38 @@ export default function SalesTrackingPage() {
       const startIso = start.toISOString();
       const endIso = end.toISOString().replace('T23:59:59.999Z', 'T23:59:59.999Z');
 
-      // Load sales and analytics data
-      const [salesResult, monthlyResult, yearlyResult] = await Promise.all([
-        db.sales.getAll(startIso, endIso),
-        db.analytics.getMonthlySummary(),
-        db.analytics.getYearlySummary(),
-      ]);
+      return db.sales.getAll(startIso, endIso);
+    },
+    [filterType, selectedMonth, selectedYear, selectedDay, startDate, endDate]
+  );
 
-      if (!cancelled) {
-        setSales((salesResult.data as SaleWithDetails[]) || []);
-        setMonthlyData((monthlyResult.data as any[]) || []);
-        setYearlyData((yearlyResult.data as any[]) || []);
-        setLoading(false);
-      }
-    }
-    loadData();
-    return () => { cancelled = true; };
-  }, [filterType, selectedMonth, selectedYear, selectedDay, startDate, endDate]);
+  const loading = salesLoading || monthlyLoading || yearlyLoading;
 
   // Calculate totals
-  const totalSales = sales.reduce((sum, sale) => sum + sale.customer_price * sale.quantity, 0);
-  const totalProfit = sales.reduce((sum, sale) => sum + sale.profit, 0);
+  const totalSales = sales?.reduce((sum, sale) => sum + sale.customer_price * sale.quantity, 0) || 0;
+  const totalProfit = sales?.reduce((sum, sale) => sum + sale.profit, 0) || 0;
   const totalLoans = sales
-    .filter(sale => sale.payment_type === 'credit')
-    .reduce((sum, sale) => sum + sale.customer_price * sale.quantity, 0);
-  const totalTransactions = sales.length;
+    ?.filter(sale => sale.payment_type === 'credit' && !sale.is_credit_paid)
+    ?.reduce((sum, sale) => sum + sale.customer_price * sale.quantity, 0) || 0;
+  const totalTransactions = sales?.length || 0;
 
   // Chart data
+  const monthlyDataArray = monthlyData || [];
+  const yearlyDataArray = yearlyData || [];
+
   const salesChartData = {
-    labels: monthlyData.slice(0, 12).map(d => new Date(d.sale_month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })),
+    labels: monthlyDataArray.slice(0, 12).map((d: any) => new Date(d.sale_month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })),
     datasets: [
       {
         label: 'Sales',
-        data: monthlyData.slice(0, 12).map(d => d.total_sales),
+        data: monthlyDataArray.slice(0, 12).map((d: any) => d.total_sales),
         backgroundColor: 'rgba(251, 146, 60, 0.8)',
         borderColor: 'rgb(251, 146, 60)',
         borderWidth: 1,
       },
       {
         label: 'Profit',
-        data: monthlyData.slice(0, 12).map(d => d.total_profit),
+        data: monthlyDataArray.slice(0, 12).map((d: any) => d.total_profit),
         backgroundColor: 'rgba(34, 197, 94, 0.8)',
         borderColor: 'rgb(34, 197, 94)',
         borderWidth: 1,
@@ -150,18 +158,18 @@ export default function SalesTrackingPage() {
   };
 
   const growthChartData = {
-    labels: yearlyData.map(d => new Date(d.sale_year).getFullYear()),
+    labels: yearlyDataArray.map((d: any) => new Date(d.sale_year).getFullYear()),
     datasets: [
       {
         label: 'Sales Growth',
-        data: yearlyData.map(d => d.total_sales),
+        data: yearlyDataArray.map((d: any) => d.total_sales),
         borderColor: 'rgb(251, 146, 60)',
         backgroundColor: 'rgba(251, 146, 60, 0.1)',
         tension: 0.4,
       },
       {
         label: 'Profit Growth',
-        data: yearlyData.map(d => d.total_profit),
+        data: yearlyDataArray.map((d: any) => d.total_profit),
         borderColor: 'rgb(34, 197, 94)',
         backgroundColor: 'rgba(34, 197, 94, 0.1)',
         tension: 0.4,
@@ -170,6 +178,8 @@ export default function SalesTrackingPage() {
   };
 
   const exportToCSV = () => {
+    if (!sales || sales.length === 0) return;
+    
     const headers = ['Date', 'Customer Name', 'Brand', 'Product', 'Payment Type', 'Base Price', 'Customer Price', 'Profit', 'Returned Empty Tank'];
     const csvData = sales.map(sale => [
       new Date(sale.sold_at).toLocaleString('en-PH'),
@@ -198,8 +208,39 @@ export default function SalesTrackingPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      <div className="animate-page-in">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Sales Tracking</h1>
+          <p className="text-gray-600">Monitor sales performance and analytics</p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <ChartSkeleton />
+          <TableSkeleton rows={10} columns={8} />
+        </div>
+      </div>
+    );
+  }
+
+  if (salesError) {
+    return (
+      <div className="animate-page-in">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Sales Tracking</h1>
+          <p className="text-gray-600">Monitor sales performance and analytics</p>
+        </div>
+
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-red-800 mb-2">Error Loading Sales Data</h2>
+          <p className="text-red-600">Please try refreshing the page or contact support.</p>
+          <button 
+            onClick={refetchSales}
+            className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
@@ -300,7 +341,7 @@ export default function SalesTrackingPage() {
           <div className="bg-linear-to-r from-orange-500 to-orange-600 rounded-xl p-6 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-orange-100 text-sm">Total Loans</p>
+                <p className="text-orange-100 text-sm">Active Total Loans</p>
                 <p className="text-2xl font-bold">₱{totalLoans.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
               </div>
               <Users className="h-8 w-8 text-orange-200" />
@@ -367,14 +408,14 @@ export default function SalesTrackingPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {sales.length === 0 ? (
+              {!sales || sales.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                     No sales found for the selected period.
                   </td>
                 </tr>
               ) : (
-                sales.map((sale) => (
+                sales?.map((sale) => (
                   <tr key={sale.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {new Date(sale.sold_at).toLocaleDateString('en-PH')}

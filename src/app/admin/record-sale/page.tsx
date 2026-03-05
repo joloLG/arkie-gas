@@ -70,7 +70,15 @@ export default function RecordSalePage() {
 
   const handleCustomerNameChange = (name: string) => {
     setCustomerName(name);
-    const matchingCustomer = customers.find(c => c.name.toLowerCase() === name.toLowerCase());
+    // Try to find matching customer by exact name match first
+    let matchingCustomer = customers.find(c => c.name.toLowerCase() === name.toLowerCase());
+    // If no exact match, try partial match for better UX
+    if (!matchingCustomer) {
+      matchingCustomer = customers.find(c =>
+        c.name.toLowerCase().includes(name.toLowerCase()) ||
+        name.toLowerCase().includes(c.name.toLowerCase())
+      );
+    }
     setSelectedCustomer(matchingCustomer || null);
   };
 
@@ -131,9 +139,22 @@ export default function RecordSalePage() {
       }
 
       setSuccess(true);
+      // Reset form after successful submission
       setTimeout(() => {
-        router.push('/admin/sales-tracking');
-      }, 2000);
+        setSuccess(false);
+        // Reset form fields
+        setSelectedProduct(null);
+        setSelectedCustomer(null);
+        setCustomerName('');
+        setQuantity(1);
+        setBasePrice(0);
+        setSellingPrice(0);
+        setCustomerPrice(0);
+        setPaymentType('cash');
+        setEmptyTanksReturned(0);
+        setNotes('');
+        setError('');
+      }, 3000);
 
     } catch (err: any) {
       setError(err.message || 'Failed to record sale');
@@ -265,6 +286,12 @@ export default function RecordSalePage() {
                 placeholder="Enter customer name"
                 required
               />
+              {selectedCustomer && (
+                <div className="mt-2 flex items-center gap-2 text-sm text-green-600">
+                  <Check className="h-4 w-4" />
+                  <span>Existing customer: {selectedCustomer.name}</span>
+                </div>
+              )}
               {customers.length > 0 && (
                 <select
                   value={selectedCustomer?.id || ''}

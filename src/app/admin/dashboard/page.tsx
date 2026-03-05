@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import Link from 'next/link';
 import { db } from '@/lib/db-complete';
+import { useOptimizedData, fetchParallel } from '@/hooks/useOptimizedData';
+import { StatCardSkeleton, CardSkeleton } from '@/components/ui/Skeleton';
 
 interface DashboardStats {
   todaySales: number;
@@ -23,59 +25,75 @@ interface DashboardStats {
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    todaySales: 0,
-    todayProfit: 0,
-    totalCredit: 0,
-    totalTanks: 0,
-    availableTanks: 0,
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchDashboardStats() {
-      setLoading(true);
+  const { data: stats, loading, error, refetch } = useOptimizedData(
+    'dashboard-stats',
+    async () => {
       const result = await db.analytics.getDashboardStats();
-      if (result) {
-        setStats(result as DashboardStats);
-      }
-      setLoading(false);
-    }
-    fetchDashboardStats();
-  }, []);
+      return { data: result };
+    },
+    []
+  );
+
+  if (loading) {
+    return (
+      <div className="p-6 md:p-8 animate-page-in">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+        </div>
+        <CardSkeleton count={2} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 md:p-8 animate-page-in">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-red-800 mb-2">Error Loading Dashboard</h2>
+          <p className="text-red-600">Please try refreshing the page or contact support.</p>
+          <button 
+            onClick={refetch}
+            className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const statsCards = [
     {
       title: "Today's Sales",
-      value: `₱${stats.todaySales.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
+      value: `₱${(stats?.todaySales || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
       icon: DollarSign,
       color: 'bg-green-100 text-green-600',
       description: "Total sales today",
     },
     {
       title: "Today's Profit",
-      value: `₱${stats.todayProfit.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
+      value: `₱${(stats?.todayProfit || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
       icon: TrendingUp,
       color: 'bg-blue-100 text-blue-600',
       description: "Profit earned today",
     },
     {
-      title: "Total Loans",
-      value: `₱${stats.totalCredit.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
-      icon: Users,
+      title: "Total Credit",
+      value: `₱${(stats?.totalCredit || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
+      icon: ShoppingCart,
       color: 'bg-orange-100 text-orange-600',
-      description: "Outstanding customer loans",
-      clickable: true,
-      href: "/admin/customer-credits",
+      description: "Outstanding customer credit",
     },
     {
-      title: "Unreturned Tanks",
-      value: `${stats.totalTanks}`,
-      icon: AlertCircle,
-      color: 'bg-red-100 text-red-600',
-      description: "Tanks not returned yet",
-      clickable: true,
-      href: "/admin/customer-tanks",
+      title: "Available Tanks",
+      value: stats?.availableTanks || 0,
+      icon: PackageOpen,
+      color: 'bg-purple-100 text-purple-600',
+      description: "Total tanks ready for sale",
     },
   ];
 
@@ -128,27 +146,16 @@ export default function AdminDashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {statsCards.map((stat, index) => (
-          <Link
-            key={stat.title}
-            href={stat.clickable ? stat.href || "#" : "#"}
-            className={`block ${stat.clickable ? 'hover:scale-105 transition-transform cursor-pointer' : ''}`}
-          >
-            <div className={`bg-white rounded-xl p-6 shadow-sm animate-slide-up stagger-${index + 1} ${
-              stat.clickable ? 'hover:shadow-md' : ''
-            }`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-2 rounded-lg ${stat.color}`}>
-                  <stat.icon className="h-5 w-5" />
-                </div>
-                {stat.clickable && (
-                  <ArrowRight className="h-4 w-4 text-gray-400" />
-                )}
+          <div key={stat.title} className="bg-white rounded-xl p-6 shadow-sm animate-slide-up stagger-{index + 1}">
+            <div className="flex items-center justify-between mb-4">
+              <div className={`p-2 rounded-lg ${stat.color}`}>
+                <stat.icon className="h-5 w-5" />
               </div>
-              <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-              <p className="text-sm text-gray-600">{stat.title}</p>
-              <p className="text-xs text-gray-500 mt-1">{stat.description}</p>
             </div>
-          </Link>
+            <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+            <p className="text-sm text-gray-600">{stat.title}</p>
+            <p className="text-xs text-gray-500 mt-1">{stat.description}</p>
+          </div>
         ))}
       </div>
 
@@ -157,7 +164,7 @@ export default function AdminDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold mb-1">Available Tanks</h3>
-            <p className="text-3xl font-bold">{stats.availableTanks}</p>
+            <p className="text-3xl font-bold">{stats?.availableTanks || 0}</p>
             <p className="text-orange-100 text-sm mt-1">Total tanks ready for sale</p>
           </div>
           <div className="bg-white/20 rounded-lg p-4">
